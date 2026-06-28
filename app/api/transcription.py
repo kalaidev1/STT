@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from app.models.transcriptionmodel import TranscriptionRequest,TranscriptionResult
+from app.schemas.transcriptionmodel import TranscriptionRequest,TranscriptionResult
 from app.service.transcription_service import transcription_service
 
 router = APIRouter(prefix="/transcribe", tags=["Transcription"])

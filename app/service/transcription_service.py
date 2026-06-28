@@ -9,7 +9,7 @@ from typing import AsyncIterator, Optional
 from fastapi import UploadFile
 
 from app.service.transcription_pool import TranscriptionOutput,TranscriptionJob,worker_pool
-from app.models.transcriptionmodel import TranscriptionRequest,TranscriptionResult,TranscriptionSegment,WordTimestamp,StreamingChunk
+from app.schemas.transcriptionmodel import TranscriptionRequest,TranscriptionResult,TranscriptionSegment,WordTimestamp,StreamingChunk
 from app.service.audio_service import audio_service
 
 class TranscriptionService:
