@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     RELOAD: bool = False
 
     # ── Whisper ──────────────────────────────────────────────
-    WHISPER_MODEL_SIZE: str = "large-v3"
+    WHISPER_MODEL_SIZE: str = "medium"
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
     WHISPER_DOWNLOAD_ROOT: str = "./models"
