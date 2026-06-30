@@ -83,28 +83,23 @@ async def transcribe_stream(
     audio: UploadFile = File(..., description="Audio file to transcribe"),
     params: TranscriptionRequest = Depends(_get_params),
 ) -> StreamingResponse:
-    request_id: str = request.state.request_id
 
-    async def _event_generator():
+    async def event_generator():
+        request_id: str = request.state.request_id
         async for chunk in transcription_service.transcribe_stream(
             upload=audio,
             params=params,
             request_id=request_id,
         ):
-            payload = chunk.model_dump_json()
-            # SSE format: "data: <json>\n\n"
-            yield f"data: {payload}\n\n"
-        # Terminal event
+            yield (
+                f"data: {chunk.model_dump_json()}\n\n"
+            )
+
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(
-        _event_generator(),
+        event_generator(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",    # tell Nginx not to buffer SSE
-            "X-Request-ID": request_id,
-        },
     )
 
      

@@ -57,25 +57,20 @@ class TranscriptionService:
     # ── Streaming (SSE / chunked) ─────────────────────────────
 
     async def transcribe_stream(
-        self,
-        upload: UploadFile,
-        params: TranscriptionRequest,
-        request_id: str,
+    self,
+    upload: UploadFile,
+    params: TranscriptionRequest,
+    request_id: str,
     ) -> AsyncIterator[StreamingChunk]:
-        """
-        Yields StreamingChunk objects as segments complete.
-        Caller (endpoint) formats these as Server-Sent Events.
-        """
-        wav_path: Optional[Path] = None
+
+        wav_path = None
+
         try:
             wav_path, _ = await audio_service.validate_and_prepare(
-                upload, request_id
+                upload,
+                request_id,
             )
 
-            # For streaming we run the worker pool job the same way
-            # but emit each segment as it materialises.
-            # Note: Faster-Whisper's transcribe() returns a lazy iterator
-            # so we can yield segments progressively.
             job = TranscriptionJob(
                 job_id=request_id,
                 audio_path=wav_path,
@@ -87,28 +82,30 @@ class TranscriptionService:
                 initial_prompt=params.initial_prompt,
             )
 
-            # Run the full job (non-streaming from pool perspective)
-            # then stream segments to caller one by one
-            output: TranscriptionOutput = await worker_pool.transcribe(job)
+            async for seg in worker_pool.transcribe_stream(job):
 
-            for i, seg in enumerate(output.segments):
-                is_final = (i == len(output.segments) - 1)
-                words = [
-                    WordTimestamp(
-                        word=w.word, start=w.start, end=w.end,
-                        probability=w.probability
-                    )
-                    for w in seg.words
-                ] if seg.words else None
+                words = None
+
+                if seg.words:
+                    words = [
+                        WordTimestamp(
+                            word=w.word,
+                            start=w.start,
+                            end=w.end,
+                            probability=w.probability,
+                        )
+                        for w in seg.words
+                    ]
 
                 yield StreamingChunk(
                     segment_id=seg.id,
                     start=seg.start,
                     end=seg.end,
                     text=seg.text,
-                    is_final=is_final,
+                    is_final=False,
                     words=words,
                 )
+
         finally:
             if wav_path:
                 audio_service.cleanup(wav_path)

@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, List, Optional
+from typing import AsyncIterator
 
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment, TranscriptionInfo
@@ -151,11 +152,10 @@ class TranscriptionWorkerPool:
         if not self._ready:
             raise ModelNotReadyError()
 
-        # If semaphore has no free slots at all, reject immediately
+        
         if self._semaphore._value == 0:
             self._queued += 1
 
-        t_submit = time.monotonic()
         try:
             async with asyncio.timeout(timeout):
                 async with self._semaphore:
@@ -169,6 +169,59 @@ class TranscriptionWorkerPool:
             raise TranscriptionTimeoutError(
                 f"Job {job.job_id} timed out after {timeout}s"
             ) from exc
+        
+
+     async def transcribe_stream(
+     self,
+     job: TranscriptionJob,
+     ) -> AsyncIterator[Segment]:
+
+        if not self._ready:
+            raise ModelNotReadyError()
+
+        async with self._semaphore:
+
+            loop = asyncio.get_running_loop()
+            queue: asyncio.Queue = asyncio.Queue()
+
+            def producer():
+                try:
+                    segments_iter, info = self._model.transcribe(
+                        str(job.audio_path),
+                        language=job.language,
+                        task=job.task,
+                        beam_size=job.beam_size,
+                        word_timestamps=job.word_timestamps,
+                        vad_filter=job.vad_filter,
+                        initial_prompt=job.initial_prompt,
+                    )
+
+                    for seg in segments_iter:
+                        loop.call_soon_threadsafe(
+                            queue.put_nowait,
+                            seg,
+                        )
+
+                finally:
+                    loop.call_soon_threadsafe(
+                        queue.put_nowait,
+                        None,
+                    )
+
+            loop.run_in_executor(
+                self._executor,
+                producer,
+            )
+
+            while True:
+                item = await queue.get()
+
+                if item is None:
+                    break
+
+                yield item
+
+
 
      async def _run_in_thread(self, job: TranscriptionJob) -> TranscriptionOutput:
         loop = asyncio.get_event_loop()
