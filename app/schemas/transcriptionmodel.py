@@ -89,10 +89,6 @@ class TranscriptionResult(BaseModel):
     processing_time_seconds: float = Field(
         description="Wall-clock time taken for transcription"
     )
-    segments: List[TranscriptionSegment] = Field(
-        default_factory=list,
-        description="Per-segment breakdown with timestamps",
-    )
     model_size: str = Field(description="Whisper model variant used")
     created_at: datetime = Field(description="UTC timestamp of completion")
 

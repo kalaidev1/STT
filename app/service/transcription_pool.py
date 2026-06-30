@@ -65,7 +65,6 @@ class TranscriptionOutput:
     language_probability: float
     duration_seconds: float
     processing_time_seconds: float
-    segments: List[SegmentResult]
     model_size: str
 
 
@@ -215,33 +214,7 @@ class TranscriptionWorkerPool:
             full_text = " ".join(s.text.strip() for s in raw_segments)
             segment_results: List[SegmentResult] = []
 
-            for seg in raw_segments:
-                words: List[WordResult] = []
-                if job.word_timestamps and seg.words:
-                    words = [
-                        WordResult(
-                            word=w.word,
-                            start=w.start,
-                            end=w.end,
-                            probability=w.probability,
-                        )
-                        for w in seg.words
-                    ]
-                segment_results.append(
-                    SegmentResult(
-                        id=seg.id,
-                        seek=seg.seek,
-                        start=seg.start,
-                        end=seg.end,
-                        text=seg.text,
-                        tokens=list(seg.tokens),
-                        temperature=seg.temperature,
-                        avg_logprob=seg.avg_logprob,
-                        compression_ratio=seg.compression_ratio,
-                        no_speech_prob=seg.no_speech_prob,
-                        words=words,
-                    )
-                )
+           
 
             elapsed = time.monotonic() - t0
 
@@ -252,7 +225,6 @@ class TranscriptionWorkerPool:
                 language_prob=round(info.language_probability, 3),
                 audio_duration=round(info.duration, 2),
                 processing_time=round(elapsed, 2),
-                segment_count=len(segment_results),
             )
 
             return TranscriptionOutput(
@@ -262,7 +234,6 @@ class TranscriptionWorkerPool:
                 language_probability=info.language_probability,
                 duration_seconds=info.duration,
                 processing_time_seconds=elapsed,
-                segments=segment_results,
                 model_size=settings.WHISPER_MODEL_SIZE,
             )
 

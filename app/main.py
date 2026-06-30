@@ -27,6 +27,7 @@ async def lifespan(app: FastAPI):
     logger.info("app.starting", env=settings.APP_ENV, version=settings.APP_VERSION)
     await worker_pool.start()
         # Background task: clean up stale temp audio files every N seconds
+        
     async def _periodic_cleanup():
         while True:
             await asyncio.sleep(settings.AUDIO_CLEANUP_INTERVAL_SECONDS)
@@ -78,14 +79,6 @@ def create_app() -> FastAPI:
     # ── Exception handlers ────────────────────────────────────
      app.add_exception_handler(STTBaseException, stt_exception_handler)
      app.add_exception_handler(Exception, unhandled_exception_handler)
-
-      # ── Prometheus ────────────────────────────────────────────
-     if settings.METRICS_ENABLED:
-        Instrumentator(
-            should_group_status_codes=True,
-            should_ignore_untemplated=True,
-            excluded_handlers=["/health", "/ready", settings.METRICS_PATH],
-        ).instrument(app).expose(app, endpoint=settings.METRICS_PATH)
 
     # ── Routes ────────────────────────────────────────────────
      app.include_router(api_v1_router)

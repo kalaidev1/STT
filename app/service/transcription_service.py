@@ -120,28 +120,7 @@ class TranscriptionService:
     def _build_result(
         output: TranscriptionOutput, job_id: str
     ) -> TranscriptionResult:
-        segments = [
-            TranscriptionSegment(
-                id=s.id,
-                seek=s.seek,
-                start=s.start,
-                end=s.end,
-                text=s.text,
-                tokens=s.tokens,
-                temperature=s.temperature,
-                avg_logprob=s.avg_logprob,
-                compression_ratio=s.compression_ratio,
-                no_speech_prob=s.no_speech_prob,
-                words=[
-                    WordTimestamp(
-                        word=w.word, start=w.start,
-                        end=w.end, probability=w.probability
-                    )
-                    for w in s.words
-                ] if s.words else None,
-            )
-            for s in output.segments
-        ]
+        
         return TranscriptionResult(
             job_id=uuid.UUID(job_id) if len(job_id) == 36 else uuid.uuid4(),
             status="completed",
@@ -150,7 +129,6 @@ class TranscriptionService:
             language_probability=output.language_probability,
             duration_seconds=output.duration_seconds,
             processing_time_seconds=output.processing_time_seconds,
-            segments=segments,
             model_size=output.model_size,
             created_at=datetime.now(timezone.utc),
         )
