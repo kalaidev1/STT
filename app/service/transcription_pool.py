@@ -212,10 +212,7 @@ class TranscriptionWorkerPool:
 
             # ── Build output ──────────────────────────────────
             full_text = " ".join(s.text.strip() for s in raw_segments)
-            segment_results: List[SegmentResult] = []
-
-           
-
+                      
             elapsed = time.monotonic() - t0
 
             logger.info(
