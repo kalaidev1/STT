@@ -174,52 +174,70 @@ class TranscriptionWorkerPool:
      async def transcribe_stream(
      self,
      job: TranscriptionJob,
+     timeout: float = 120.0,
      ) -> AsyncIterator[Segment]:
 
         if not self._ready:
             raise ModelNotReadyError()
 
-        async with self._semaphore:
+        if self._semaphore._value == 0:
+            self._queued += 1
 
-            loop = asyncio.get_running_loop()
-            queue: asyncio.Queue = asyncio.Queue()
+        try:
+            async with asyncio.timeout(timeout):
+                async with self._semaphore:
+                    self._queued = max(0, self._queued - 1)
 
-            def producer():
-                try:
-                    segments_iter, info = self._model.transcribe(
-                        str(job.audio_path),
-                        language=job.language,
-                        task=job.task,
-                        beam_size=job.beam_size,
-                        word_timestamps=job.word_timestamps,
-                        vad_filter=job.vad_filter,
-                        initial_prompt=job.initial_prompt,
+                    loop = asyncio.get_running_loop()
+                    queue: asyncio.Queue = asyncio.Queue()
+
+                    def producer():
+                        try:
+                            segments_iter, info = self._model.transcribe(
+                                str(job.audio_path),
+                                language=job.language,
+                                task=job.task,
+                                beam_size=job.beam_size,
+                                word_timestamps=job.word_timestamps,
+                                vad_filter=job.vad_filter,
+                                initial_prompt=job.initial_prompt,
+                            )
+
+                            for seg in segments_iter:
+                                loop.call_soon_threadsafe(
+                                    queue.put_nowait,
+                                    seg,
+                                )
+                        except Exception as exc:
+                            loop.call_soon_threadsafe(
+                                queue.put_nowait,
+                                exc,
+                            )
+                        finally:
+                            loop.call_soon_threadsafe(
+                                queue.put_nowait,
+                                None,
+                            )
+
+                    loop.run_in_executor(
+                        self._executor,
+                        producer,
                     )
 
-                    for seg in segments_iter:
-                        loop.call_soon_threadsafe(
-                            queue.put_nowait,
-                            seg,
-                        )
+                    while True:
+                        item = await queue.get()
 
-                finally:
-                    loop.call_soon_threadsafe(
-                        queue.put_nowait,
-                        None,
-                    )
+                        if isinstance(item, Exception):
+                            raise TranscriptionError(f"Transcription failed: {item}") from item
 
-            loop.run_in_executor(
-                self._executor,
-                producer,
-            )
+                        if item is None:
+                            break
 
-            while True:
-                item = await queue.get()
-
-                if item is None:
-                    break
-
-                yield item
+                        yield item
+        except TimeoutError as exc:
+            raise TranscriptionTimeoutError(
+                f"Job {job.job_id} timed out after {timeout}s"
+            ) from exc
 
 
 

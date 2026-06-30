@@ -54,63 +54,7 @@ class TranscriptionService:
             if wav_path:
                 audio_service.cleanup(wav_path)
 
-    # ── Streaming (SSE / chunked) ─────────────────────────────
-
-    async def transcribe_stream(
-    self,
-    upload: UploadFile,
-    params: TranscriptionRequest,
-    request_id: str,
-    ) -> AsyncIterator[StreamingChunk]:
-
-        wav_path = None
-
-        try:
-            wav_path, _ = await audio_service.validate_and_prepare(
-                upload,
-                request_id,
-            )
-
-            job = TranscriptionJob(
-                job_id=request_id,
-                audio_path=wav_path,
-                language=params.language,
-                task=params.task,
-                beam_size=params.beam_size,
-                word_timestamps=params.word_timestamps,
-                vad_filter=params.vad_filter,
-                initial_prompt=params.initial_prompt,
-            )
-
-            async for seg in worker_pool.transcribe_stream(job):
-
-                words = None
-
-                if seg.words:
-                    words = [
-                        WordTimestamp(
-                            word=w.word,
-                            start=w.start,
-                            end=w.end,
-                            probability=w.probability,
-                        )
-                        for w in seg.words
-                    ]
-
-                yield StreamingChunk(
-                    segment_id=seg.id,
-                    start=seg.start,
-                    end=seg.end,
-                    text=seg.text,
-                    is_final=False,
-                    words=words,
-                )
-
-        finally:
-            if wav_path:
-                audio_service.cleanup(wav_path)
-        
-
+    
     # ── Private helpers ───────────────────────────────────────
 
     @staticmethod
